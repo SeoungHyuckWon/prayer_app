@@ -17,6 +17,81 @@ class _PrayerListScreenState extends State<PrayerListScreen> {
   PrayerStatus? _selectedStatus;
   late DateTimeRange _dateRange;
 
+  // 오늘 날짜로 검색되어 있는지 확인
+  bool get _isTodaySelected {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final todayEnd = today
+        .add(const Duration(days: 1))
+        .subtract(const Duration(milliseconds: 1));
+    return _dateRange.start == today && _dateRange.end == todayEnd;
+  }
+
+  // 이전 기도제목 가져오기
+  Future<void> _importPreviousPrayers() async {
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().subtract(const Duration(days: 1)),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().subtract(const Duration(days: 1)), // 어제까지
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Colors.blue[300]!,
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (selectedDate == null) return;
+
+    try {
+      final firestoreService = FirestoreService();
+      final prayers = await firestoreService.getPrayersByDate(selectedDate);
+
+      if (prayers.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(
+                    '${selectedDate.month}/${selectedDate.day}에 작성한 기도제목이 없습니다')),
+          );
+        }
+        return;
+      }
+
+      // 각 기도제목을 오늘 날짜로 복사
+      for (final prayer in prayers) {
+        final newPrayer = Prayer(
+          userId: prayer.userId,
+          title: prayer.title,
+          content: prayer.content,
+          status: prayer.status,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+        await firestoreService.addPrayer(newPrayer);
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${prayers.length}개의 기도제목을 가져왔습니다')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('기도제목 가져오기에 실패했습니다')),
+        );
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -283,36 +358,79 @@ class _PrayerListScreenState extends State<PrayerListScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const PrayerFormScreen(),
+      floatingActionButton: _isTodaySelected
+          ? Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                FloatingActionButton(
+                  onPressed: _importPreviousPrayers,
+                  child: const Icon(Icons.replay),
+                  backgroundColor: Colors.blue[300],
+                  tooltip: '이전 기도제목 가져오기',
+                ),
+                const SizedBox(height: 16),
+                FloatingActionButton(
+                  onPressed: () async {
+                    final result = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PrayerFormScreen(),
+                      ),
+                    );
+                    // 저장 성공 시 성공 메시지 표시
+                    if (result == true && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('기도제목이 저장되었습니다'),
+                          backgroundColor: Colors.green,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    } else if (result == false && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('저장에 실패했습니다'),
+                          backgroundColor: Colors.red,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Icon(Icons.add),
+                  backgroundColor: Colors.blue[300],
+                ),
+              ],
+            )
+          : FloatingActionButton(
+              onPressed: () async {
+                final result = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PrayerFormScreen(),
+                  ),
+                );
+                // 저장 성공 시 성공 메시지 표시
+                if (result == true && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('기도제목이 저장되었습니다'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                } else if (result == false && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('저장에 실패했습니다'),
+                      backgroundColor: Colors.red,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+              child: const Icon(Icons.add),
+              backgroundColor: Colors.blue[300],
             ),
-          );
-          // 저장 성공 시 성공 메시지 표시
-          if (result == true && context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('기도제목이 저장되었습니다'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 2),
-              ),
-            );
-          } else if (result == false && context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('저장에 실패했습니다'),
-                backgroundColor: Colors.red,
-                duration: Duration(seconds: 2),
-              ),
-            );
-          }
-        },
-        child: const Icon(Icons.add),
-        backgroundColor: Colors.blue[300],
-      ),
     );
   }
 }

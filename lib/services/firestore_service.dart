@@ -255,6 +255,22 @@ class FirestoreService {
     return snapshot.docs.map((doc) => Prayer.fromFirestore(doc)).toList();
   }
 
+  // 특정 날짜의 기도제목 목록 조회
+  Future<List<Prayer>> getPrayersByDate(DateTime date) async {
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = startOfDay
+        .add(const Duration(days: 1))
+        .subtract(const Duration(milliseconds: 1));
+
+    final snapshot = await _prayersRef
+        .where('createdAt',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .where('createdAt', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay))
+        .get();
+
+    return snapshot.docs.map((doc) => Prayer.fromFirestore(doc)).toList();
+  }
+
   // 올해의 기도제목 체크리스트 관련 메서드
   CollectionReference _getYearPrayerItemsRef(String userId, int year) {
     return _firestore
