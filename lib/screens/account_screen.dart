@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'login_screen.dart';
 import 'year_prayer_checklist_screen.dart';
 import 'prayer_attendance_calendar_screen.dart';
+import 'change_password_screen.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -93,9 +94,11 @@ class _AccountScreenState extends State<AccountScreen> {
               title: const Text('비밀번호 변경'),
               trailing: const Icon(Icons.arrow_forward_ios),
               onTap: () {
-                // 비밀번호 변경 화면으로 이동
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('비밀번호 변경 기능은 준비중입니다')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ChangePasswordScreen(),
+                  ),
                 );
               },
             ),
