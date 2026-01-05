@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../models/gratitude.dart';
 import '../models/prayer.dart';
+import '../models/prayer_attendance.dart';
 import '../models/year_prayer_item.dart';
 
 const uuid = Uuid();
@@ -340,5 +341,93 @@ class FirestoreService {
         await ref.doc(updated.id).update(updated.toFirestore());
       }
     }
+  }
+
+  // 기도 출석체크 관련 메서드
+  CollectionReference _getPrayerAttendanceRef(String userId) {
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('prayerAttendances');
+  }
+
+  // 출석체크 목록 조회 (스트림)
+  Stream<List<PrayerAttendance>> getPrayerAttendancesStream(String userId) {
+    return _getPrayerAttendanceRef(userId)
+        .snapshots(includeMetadataChanges: false)
+        .map((snapshot) {
+      if (snapshot.docs.isEmpty) {
+        return <PrayerAttendance>[];
+      }
+      return snapshot.docs
+          .map((doc) => PrayerAttendance.fromFirestore(doc))
+          .toList();
+    }).handleError((error) {
+      debugPrint('FirestoreService.getPrayerAttendancesStream: 에러 발생 - $error');
+      return <PrayerAttendance>[];
+    });
+  }
+
+  // 특정 년도의 출석체크 목록 조회
+  Stream<List<PrayerAttendance>> getPrayerAttendancesByYearStream(
+      String userId, int year) {
+    final startOfYear = DateTime(year, 1, 1);
+    final endOfYear = DateTime(year, 12, 31, 23, 59, 59);
+
+    return _getPrayerAttendanceRef(userId)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfYear))
+        .where('date', isLessThanOrEqualTo: Timestamp.fromDate(endOfYear))
+        .snapshots(includeMetadataChanges: false)
+        .map((snapshot) {
+      if (snapshot.docs.isEmpty) {
+        return <PrayerAttendance>[];
+      }
+      return snapshot.docs
+          .map((doc) => PrayerAttendance.fromFirestore(doc))
+          .toList();
+    }).handleError((error) {
+      debugPrint(
+          'FirestoreService.getPrayerAttendancesByYearStream: 에러 발생 - $error');
+      return <PrayerAttendance>[];
+    });
+  }
+
+  // 출석체크 추가/수정
+  Future<void> setPrayerAttendance(PrayerAttendance attendance) async {
+    try {
+      debugPrint('FirestoreService.setPrayerAttendance: 저장 시작');
+      final dateKey = attendance.dateKey;
+      final existingDoc =
+          await _getPrayerAttendanceRef(attendance.userId).doc(dateKey).get();
+
+      if (existingDoc.exists) {
+        // 기존 기록이 있으면 업데이트
+        await _getPrayerAttendanceRef(attendance.userId)
+            .doc(dateKey)
+            .update(attendance.toFirestore());
+        debugPrint('FirestoreService.setPrayerAttendance 업데이트 성공: $dateKey');
+      } else {
+        // 새 기록이면 추가
+        await _getPrayerAttendanceRef(attendance.userId)
+            .doc(dateKey)
+            .set(attendance.toFirestore());
+        debugPrint('FirestoreService.setPrayerAttendance 추가 성공: $dateKey');
+      }
+    } catch (e) {
+      debugPrint('FirestoreService.setPrayerAttendance 에러: $e');
+      rethrow;
+    }
+  }
+
+  // 출석체크 삭제
+  Future<void> deletePrayerAttendance(String userId, String dateKey) async {
+    await _getPrayerAttendanceRef(userId).doc(dateKey).delete();
+  }
+
+  // 올해 기도 횟수 계산
+  Future<int> getPrayerCountThisYear(String userId, int year) async {
+    final attendances =
+        await getPrayerAttendancesByYearStream(userId, year).first;
+    return attendances.where((attendance) => attendance.isPrayed).length;
   }
 }

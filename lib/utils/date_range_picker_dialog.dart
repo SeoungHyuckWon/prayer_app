@@ -88,8 +88,11 @@ class _CustomDateRangePickerDialogState
                 onDaySelected: _isSingleDayMode
                     ? (selectedDay, focusedDay) {
                         setState(() {
-                          _startDate = selectedDay;
-                          _endDate = selectedDay
+                          // 날짜만 사용해서 시간대 문제 방지
+                          final dateOnly = DateTime(selectedDay.year,
+                              selectedDay.month, selectedDay.day);
+                          _startDate = dateOnly;
+                          _endDate = dateOnly
                               .add(const Duration(days: 1))
                               .subtract(const Duration(milliseconds: 1));
                           _focusedDay = focusedDay;
@@ -99,10 +102,15 @@ class _CustomDateRangePickerDialogState
                 onRangeSelected: !_isSingleDayMode
                     ? (start, end, focusedDay) {
                         setState(() {
-                          _startDate = start;
-                          _endDate = end
-                              ?.add(const Duration(days: 1))
-                              .subtract(const Duration(milliseconds: 1));
+                          // 날짜만 사용해서 시간대 문제 방지
+                          _startDate = start != null
+                              ? DateTime(start.year, start.month, start.day)
+                              : null;
+                          _endDate = end != null
+                              ? DateTime(end.year, end.month, end.day)
+                                  .add(const Duration(days: 1))
+                                  .subtract(const Duration(milliseconds: 1))
+                              : null;
                           _focusedDay = focusedDay ?? DateTime.now();
                         });
                       }
