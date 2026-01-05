@@ -446,4 +446,54 @@ class FirestoreService {
         await getPrayerAttendancesByYearStream(userId, year).first;
     return attendances.where((attendance) => attendance.isPrayed).length;
   }
+
+  // 계정 삭제 시 모든 사용자 데이터 삭제
+  Future<void> deleteAllUserData(String userId) async {
+    try {
+      debugPrint('FirestoreService.deleteAllUserData: 사용자 데이터 삭제 시작 - $userId');
+
+      // 기도제목 삭제
+      final prayersSnapshot =
+          await _prayersRef.where('userId', isEqualTo: userId).get();
+      final prayersBatch = FirebaseFirestore.instance.batch();
+      for (final doc in prayersSnapshot.docs) {
+        prayersBatch.delete(doc.reference);
+      }
+      await prayersBatch.commit();
+
+      // 감사 삭제
+      final gratitudesSnapshot =
+          await _gratitudesRef.where('userId', isEqualTo: userId).get();
+      final gratitudesBatch = FirebaseFirestore.instance.batch();
+      for (final doc in gratitudesSnapshot.docs) {
+        gratitudesBatch.delete(doc.reference);
+      }
+      await gratitudesBatch.commit();
+
+      // 사용자별 컬렉션 데이터 삭제 (yearPrayers, prayerAttendances)
+      final userDocRef =
+          FirebaseFirestore.instance.collection('users').doc(userId);
+      final userCollections = ['yearPrayers', 'prayerAttendances'];
+
+      for (final collectionName in userCollections) {
+        final collectionRef = userDocRef.collection(collectionName);
+        final snapshot = await collectionRef.get();
+        if (snapshot.docs.isNotEmpty) {
+          final batch = FirebaseFirestore.instance.batch();
+          for (final doc in snapshot.docs) {
+            batch.delete(doc.reference);
+          }
+          await batch.commit();
+        }
+      }
+
+      // 사용자 문서 삭제
+      await userDocRef.delete();
+
+      debugPrint('FirestoreService.deleteAllUserData: 사용자 데이터 삭제 완료 - $userId');
+    } catch (e) {
+      debugPrint('FirestoreService.deleteAllUserData: 에러 발생 - $e');
+      rethrow;
+    }
+  }
 }

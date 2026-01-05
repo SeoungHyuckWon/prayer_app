@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../services/firestore_service.dart';
 import 'login_screen.dart';
 import 'year_prayer_checklist_screen.dart';
 import 'prayer_attendance_calendar_screen.dart';
@@ -13,6 +14,9 @@ class AccountScreen extends StatefulWidget {
 }
 
 class _AccountScreenState extends State<AccountScreen> {
+  final FirestoreService _firestoreService = FirestoreService();
+  bool _isDeleting = false;
+
   Future<void> _signOut() async {
     await FirebaseAuth.instance.signOut();
     if (context.mounted) {
@@ -20,6 +24,58 @@ class _AccountScreenState extends State<AccountScreen> {
         MaterialPageRoute(builder: (context) => const LoginScreen()),
         (route) => false,
       );
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    // 비밀번호 확인 다이얼로그
+    final passwordConfirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _PasswordConfirmationDialog(),
+    );
+
+    if (passwordConfirmed != true) return;
+
+    setState(() => _isDeleting = true);
+
+    try {
+      // Firestore 데이터 삭제
+      await _firestoreService.deleteAllUserData(user.uid);
+
+      // Firebase Auth 계정 삭제
+      await user.delete();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('계정이 성공적으로 삭제되었습니다')),
+        );
+
+        // 로그인 화면으로 이동
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      String errorMessage = '계정 삭제에 실패했습니다';
+
+      if (e.toString().contains('requires-recent-login')) {
+        errorMessage = '보안 정책으로 인해 최근 로그인 기록이 필요합니다. 재로그인 후 다시 시도해주세요.';
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+      }
     }
   }
 
@@ -106,34 +162,7 @@ class _AccountScreenState extends State<AccountScreen> {
               leading: const Icon(Icons.delete, color: Colors.red),
               title: const Text('계정 삭제', style: TextStyle(color: Colors.red)),
               trailing: const Icon(Icons.arrow_forward_ios),
-              onTap: () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('계정 삭제'),
-                    content: const Text('정말로 계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('취소'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        style:
-                            TextButton.styleFrom(foregroundColor: Colors.red),
-                        child: const Text('삭제'),
-                      ),
-                    ],
-                  ),
-                );
-
-                if (confirm == true) {
-                  // 계정 삭제 로직
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('계정 삭제 기능은 준비중입니다')),
-                  );
-                }
-              },
+              onTap: _isDeleting ? null : _deleteAccount,
             ),
             const Spacer(),
             SizedBox(
@@ -157,6 +186,106 @@ class _AccountScreenState extends State<AccountScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// 비밀번호 확인 다이얼로그
+class _PasswordConfirmationDialog extends StatefulWidget {
+  const _PasswordConfirmationDialog();
+
+  @override
+  State<_PasswordConfirmationDialog> createState() =>
+      _PasswordConfirmationDialogState();
+}
+
+class _PasswordConfirmationDialogState
+    extends State<_PasswordConfirmationDialog> {
+  final _passwordController = TextEditingController();
+  bool _isVerifying = false;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _verifyPassword() async {
+    final password = _passwordController.text.trim();
+    if (password.isEmpty) return;
+
+    setState(() => _isVerifying = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null || user.email == null) {
+        Navigator.of(context).pop(false);
+        return;
+      }
+
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: password,
+      );
+
+      await user.reauthenticateWithCredential(credential);
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('비밀번호가 올바르지 않습니다')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isVerifying = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('비밀번호 확인'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('계정 삭제를 위해 현재 비밀번호를 입력해주세요.'),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _passwordController,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: '현재 비밀번호',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (_) => _verifyPassword(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('취소'),
+        ),
+        ElevatedButton(
+          onPressed: _isVerifying ? null : _verifyPassword,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+          ),
+          child: _isVerifying
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('확인'),
+        ),
+      ],
     );
   }
 }
