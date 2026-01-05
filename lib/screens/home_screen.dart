@@ -15,12 +15,21 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
-  final List<Widget> _screens = [
-    const GratitudeListScreen(),
-    const PrayerListScreen(),
-    StatisticsScreen(),
-    const AccountScreen(),
-  ];
+  // 탭 변경 시 새 인스턴스 생성
+  Widget _getScreen(int index) {
+    switch (index) {
+      case 0:
+        return GratitudeListScreen();
+      case 1:
+        return PrayerListScreen();
+      case 2:
+        return StatisticsScreen();
+      case 3:
+        return AccountScreen();
+      default:
+        return GratitudeListScreen();
+    }
+  }
 
   // 탭 변경 메서드
   void changeTab(int index) {
@@ -32,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: _getScreen(_currentIndex),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {

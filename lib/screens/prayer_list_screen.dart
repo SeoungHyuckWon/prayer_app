@@ -15,12 +15,22 @@ class PrayerListScreen extends StatefulWidget {
 
 class _PrayerListScreenState extends State<PrayerListScreen> {
   PrayerStatus? _selectedStatus;
-  DateTimeRange _dateRange = DateTimeRange(
-    start:
-        DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
-    end: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day,
-        23, 59, 59, 999, 999),
-  );
+  late DateTimeRange _dateRange;
+
+  @override
+  void initState() {
+    super.initState();
+    // 탭 이동할 때마다 오늘 날짜로 초기화
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    _dateRange = DateTimeRange(
+      start: today,
+      end: today
+          .add(const Duration(days: 1))
+          .subtract(const Duration(milliseconds: 1)),
+    );
+    debugPrint('PrayerListScreen initState: dateRange = $_dateRange');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +52,8 @@ class _PrayerListScreenState extends State<PrayerListScreen> {
                 setState(() {
                   _dateRange = picked;
                 });
+                debugPrint(
+                    'Selected date range: start=${picked.start}, end=${picked.end}');
               }
             },
           ),

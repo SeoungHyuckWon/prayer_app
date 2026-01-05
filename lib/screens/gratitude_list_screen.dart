@@ -14,12 +14,19 @@ class GratitudeListScreen extends StatefulWidget {
 }
 
 class _GratitudeListScreenState extends State<GratitudeListScreen> {
-  DateTimeRange _dateRange = DateTimeRange(
-    start:
-        DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
-    end: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day,
-        23, 59, 59, 999, 999),
-  );
+  late DateTimeRange _dateRange;
+
+  @override
+  void initState() {
+    super.initState();
+    // 탭 이동할 때마다 오늘 날짜로 초기화
+    _dateRange = DateTimeRange(
+      start: DateTime(
+          DateTime.now().year, DateTime.now().month, DateTime.now().day),
+      end: DateTime(DateTime.now().year, DateTime.now().month,
+          DateTime.now().day, 23, 59, 59, 999, 999),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +48,8 @@ class _GratitudeListScreenState extends State<GratitudeListScreen> {
                 setState(() {
                   _dateRange = picked;
                 });
+                debugPrint(
+                    'Selected date range: start=${picked.start}, end=${picked.end}');
               }
             },
           ),

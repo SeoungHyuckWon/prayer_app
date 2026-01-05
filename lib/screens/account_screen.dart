@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'login_screen.dart';
 import 'year_prayer_checklist_screen.dart';
+import 'prayer_attendance_calendar_screen.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -69,6 +70,20 @@ class _AccountScreenState extends State<AccountScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (context) => const YearPrayerChecklistScreen(),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.calendar_today),
+              title: const Text('기도 출석체크'),
+              trailing: const Icon(Icons.arrow_forward_ios),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const PrayerAttendanceCalendarScreen(),
                   ),
                 );
               },
